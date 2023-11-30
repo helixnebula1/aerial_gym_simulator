@@ -7,8 +7,9 @@
 import math
 import numpy as np
 import os
-import torch
 import xml.etree.ElementTree as ET
+import torch
+
 
 
 from aerial_gym import AERIAL_GYM_ROOT_DIR, AERIAL_GYM_ROOT_DIR
@@ -22,6 +23,8 @@ from aerial_gym.envs.controllers.controller import Controller
 import matplotlib.pyplot as plt
 from aerial_gym.utils.helpers import asset_class_to_AssetOptions
 import time
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class AerialRobot(BaseTask):
 

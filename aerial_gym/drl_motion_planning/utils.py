@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from collections import namedtuple, deque
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
@@ -40,8 +42,8 @@ def get_action(current_pos, motion_primitive):
                             [1, 0, -1],
                             [1, -1, -1],
                             [1, -1, 0],
-                            [1, -1, 1]], dtype=torch.float32)
+                            [1, -1, 1]], dtype=torch.float32, device=DEVICE)
 
-    #motion_primitive = torch.tensor(motion_primitive)
+    motion_primitive = torch.tensor(motion_primitive, device=DEVICE)
     #return current_pos + torch.matmul(actions, motion_primitive)
-    return current_pos + torch.matmul(motion_primitive, actions)
+    return torch.tensor(current_pos, device=DEVICE) + torch.matmul(motion_primitive, actions)

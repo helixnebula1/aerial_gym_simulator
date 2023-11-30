@@ -1,14 +1,15 @@
-import torch
 import argparse
 import numpy as np
 
 from collections import deque
 
+import isaacgym
 from aerial_gym.envs import *
 from aerial_gym.utils import get_args, task_registry
+import torch
 
-from drl_motion_planning.utils import *
-from drl_motion_planning.models import DQN
+from utils import *
+from models import DQN
 
 torch.manual_seed(42)
 
@@ -18,7 +19,8 @@ ACTION_DIM = 18
 
 
 def test_policy(args):
-    env, env_cfg = task_registry.make_env(args.env_name, args)
+    #env, env_cfg = task_registry.make_env(args.env_name, args)
+    env, env_cfg = task_registry.make_env(name=args.task, args=args)
 
     # Generating random actions
     command_actions = torch.zeros((env_cfg.env.num_envs, env_cfg.env.num_actions))
@@ -27,11 +29,12 @@ def test_policy(args):
 
     mp = np.random.randint(1, ACTION_DIM)
     motion_primitive[:, mp] = 1.0
-    target_pos = get_action(current_pos, mp)
+    target_pos = get_action(current_pos, motion_primitive)
     # Using Lee Position Controller
-    command_actions[:, 0] = target_pos[0] # x
-    command_actions[:, 1] = target_pos[1] # y
-    command_actions[:, 2] = target_pos[2] # z
+
+    command_actions[:, 0] = target_pos[:,0] # x
+    command_actions[:, 1] = target_pos[:,1] # y
+    command_actions[:, 2] = target_pos[:,2] # z
     command_actions[:, 3] = 0.0 # yaw
 
     env.reset()
@@ -44,7 +47,7 @@ def test_policy(args):
             current_pos = obs[:, :3]
             mp = np.random.randint(1, ACTION_DIM)
             motion_primitive[:, mp] = 1.0
-            target_pos = get_action(current_pos, mp)
+            target_pos = get_action(current_pos, motion_primitive)
             # Using Lee Position Controller
             command_actions[:, 0] = target_pos[:, 0] # x
             command_actions[:, 1] = target_pos[:, 1] # y
@@ -56,5 +59,5 @@ def test_policy(args):
 
 
 if __name__ == "__main__":
-    args = get_args()
+    args=get_args()
     test_policy(args)
