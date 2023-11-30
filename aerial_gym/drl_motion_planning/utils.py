@@ -42,4 +42,5 @@ def get_action(current_pos, motion_primitive):
                             [1, -1, 0],
                             [1, -1, 1]], dtype=torch.float32)
 
-    return current_pos + torch.matmul(actions, motion_primitive)
+    #motion_primitive = torch.tensor(motion_primitive)
+    return current_pos + torch.matmul(motion_primitive, actions)
