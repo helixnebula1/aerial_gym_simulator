@@ -22,27 +22,32 @@ def test_policy(args):
 
     # Generating random actions
     command_actions = torch.zeros((env_cfg.env.num_envs, env_cfg.env.num_actions))
-    command_actions[:, 0] = 0.0
-    env.reset()
-    current_pos = np.array([0.0, 0.0, 0.0]) # Check how to get initial pos
+    current_pos = np.array([0.0, 0.0, 0.0])
 
+    mp = np.random.randint(1, ACTION_DIM)
+    target_pos = get_action(current_pos, mp)
+    # Using Lee Position Controller
+    command_actions[:, 0] = target_pos[0] # x
+    command_actions[:, 1] = target_pos[1] # y
+    command_actions[:, 2] = target_pos[2] # z
+    command_actions[:, 3] = 0.0 # yaw
+
+    env.reset()
     for i in range(0, 50000):
-        mp = np.random.randint(1, ACTION_DIM)
-        target_pos = get_action(current_pos, mp)
-        command_actions[:, 1] = target_pos[0]
-        command_actions[:, 2] = target_pos[1]
-        command_actions[:, 3] = target_pos[2]
+
         obs, priviliged_obs, rewards, resets, extras = env.step(command_actions)
 
         if i % 500 == 0:
-            print("Resetting environment")
-            print("Shape of observation tensor", obs.shape)
-            print("Shape of reward tensor", rewards.shape)
-            print("Shape of reset tensor", resets.shape)
-            if priviliged_obs is None:
-                print("Privileged observation is None")
-            else:
-                print("Shape of privileged observation tensor", priviliged_obs.shape)
+            print("Resetting command")
+            current_pos = obs[0, :3] #! THIS IS A PROBLEM
+            mp = np.random.randint(1, ACTION_DIM)
+            target_pos = get_action(current_pos, mp)
+            # Using Lee Position Controller
+            command_actions[:, 0] = target_pos[0] # x
+            command_actions[:, 1] = target_pos[1] # y
+            command_actions[:, 2] = target_pos[2] # z
+            command_actions[:, 3] = 0.0 # yaw
+            print("target position", target_pos)
             print("------------------")
             env.reset()
 

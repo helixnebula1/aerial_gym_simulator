@@ -35,15 +35,14 @@ class DQN(nn.Module):
 
         self.combined_img_pos_block = nn.Sequential(
             nn.Linear(24, 32),
-            nn.Linear(32, action_dim),
-            nn.Softmax(dim=1) # check
+            nn.Linear(32, action_dim)
         )
 
     def forward(self, depth_imgs, rel_pos):
 
-        i1 = self.img_block(depth_imgs[:, 0, :])
-        i2 = self.img_block(depth_imgs[:, 1, :])
-        i3 = self.latest_img_block(depth_imgs[:, 2, :])
+        i1 = self.img_block(depth_imgs[:, 0, :]) # t-2
+        i2 = self.img_block(depth_imgs[:, 1, :]) # t-1
+        i3 = self.latest_img_block(depth_imgs[:, 2, :]) # t
         i = torch.cat((i1, i2, i3), dim=1)
         i = self.combine_img_layer(i)
 
@@ -55,5 +54,6 @@ class DQN(nn.Module):
 
         combined = torch.cat((i, pos), dim=1)
         combined = self.combined_img_pos_block(combined)
+        combined = F.softmax(combined, dim=1)
 
         return combined
