@@ -22,9 +22,11 @@ def test_policy(args):
 
     # Generating random actions
     command_actions = torch.zeros((env_cfg.env.num_envs, env_cfg.env.num_actions))
-    current_pos = np.array([0.0, 0.0, 0.0])
+    motion_primitive = torch.zeros((env_cfg.env.num_envs, ACTION_DIM))
+    current_pos = torch.zeros((env_cfg.env.num_envs, 3))
 
     mp = np.random.randint(1, ACTION_DIM)
+    motion_primitive[:, mp] = 1.0
     target_pos = get_action(current_pos, mp)
     # Using Lee Position Controller
     command_actions[:, 0] = target_pos[0] # x
@@ -39,13 +41,14 @@ def test_policy(args):
 
         if i % 500 == 0:
             print("Resetting command")
-            current_pos = obs[0, :3] #! THIS IS A PROBLEM
+            current_pos = obs[:, :3]
             mp = np.random.randint(1, ACTION_DIM)
+            motion_primitive[:, mp] = 1.0
             target_pos = get_action(current_pos, mp)
             # Using Lee Position Controller
-            command_actions[:, 0] = target_pos[0] # x
-            command_actions[:, 1] = target_pos[1] # y
-            command_actions[:, 2] = target_pos[2] # z
+            command_actions[:, 0] = target_pos[:, 0] # x
+            command_actions[:, 1] = target_pos[:, 1] # y
+            command_actions[:, 2] = target_pos[:, 2] # z
             command_actions[:, 3] = 0.0 # yaw
             print("target position", target_pos)
             print("------------------")
