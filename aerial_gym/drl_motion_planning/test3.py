@@ -34,63 +34,36 @@ class ActionObj:
         self.motionPrimitive = torch.zeros((env_cfg.env.num_envs, ACTION_DIM))
         self.currentPos = torch.zeros((env_cfg.env.num_envs, 3))
 
-def get_depth_image(num_envs, env, env_cfg):  # TODO no idea where this goes
+def get_depth_image(env):  # TODO no idea where this goes
     # python3 test3.py --num_envs 1 --task="quad_with_obstacles" to get camera_handles
-    # num_envs = env_cfg.env.num_envs,
-    # aerial_robot_with_obstacles.py has the camera_handles defined in def _create_envs(self):
-    # j is either 0 or 1
     from isaacgym import gymapi
+    IMAGE_HEIGHT = 270
+    IMAGE_WIDTH = 480
 
-    # Print out all the members of env, and env_cfg
-    #all_members(env_cfg, env)
-    #print("Tyep envs ", type(env.envs))     # list
+    num_envs = env.num_envs
+    depth_images = np.zeros((IMAGE_HEIGHT, IMAGE_WIDTH, num_envs))
 
-    #print("type img depth ", type(gymapi.IMAGE_DEPTH))
-    #print("type env.sim ", type(env.sim))
-    #print("type env.envs[0] ", type(env.envs[0]))
-    #print("Tyep cam handles[0][0] ", type(env.camera_handles), len(env.camera_handles)) # list
-    #print(" Cam handle is ", env.camera_handles[0])
+    #depth_image = env.gym.get_camera_image(env.sim, env.envs[0], env.camera_handles[0], gymapi.IMAGE_DEPTH)
+    #print("type of depth image ", type(depth_image))
+    #print("shape depth_image ", depth_image.shape)
 
+    for ii in range(num_envs):
 
-    #depth_image = gym.get_camera_image(env.sim, envs[i], camera_handles[i][j], gymapi.IMAGE_DEPTH)
-    depth_image = env.gym.get_camera_image(env.sim, env.envs[0], env.camera_handles[0], gymapi.IMAGE_DEPTH)
-    print("type of depth image ",type(depth_image))
-    print("shape depth_image ", depth_image.shape)
+        depth_image = env.gym.get_camera_image(env.sim, env.envs[ii], env.camera_handles[ii], gymapi.IMAGE_DEPTH)
 
-    #attrs = vars(env.gym)
-    #attrs = vars(env_cfg)
-    #print(', '.join("%s: %s" % item for item in attrs.items()))
-    #print(env.gym)
+        # -inf implies no depth value, set it to zero. output will be black.
+        depth_image[depth_image == -np.inf] = 0
 
+        # clamp depth image to 10 meters to make output image human friendly
+        depth_image[depth_image < -10] = -10
 
-    #for ii in range(num_envs):
-    #    for jj in range(2):
-    #        pass
-            # The gym utility to write images to disk is recommended only for RGB images.
-            #rgb_filename = "graphics_images/rgb_env%d_cam%d_frame%d.png" % (ii, jj, frame_count)
-            #gym.write_camera_image_to_file(sim, envs[ii], camera_handles[ii][jj], gymapi.IMAGE_COLOR, rgb_filename)
-            #class BaseTask in base_task.py defines self.gym
-            # which is used by aerial_gym/envs/base/aerial_robot.py:class AerialRobot(BaseTask):
-            # also used by aerial_gym/envs/base/aerial_robot_with_obstacles.py:class AerialRobotWithObstacles(BaseTask):
+        # flip the direction so near-objects are light and far objects are dark
+        normalized_depth = -255.0 * (depth_image / np.min(depth_image + 1e-4))
 
-            # Retrieve image data directly. Use this for Depth, Segmentation, and Optical Flow images
-            # Here we retrieve a depth image, normalize it to be visible in an
-            # output image and then write it to disk using Pillow
-            #depth_image = env.gym.get_camera_image(sim, envs[ii], camera_handles[ii][jj], gymapi.IMAGE_DEPTH)
-
-            # -inf implies no depth value, set it to zero. output will be black.
-            #depth_image[depth_image == -np.inf] = 0
-            #print(f"Depth image shape : {depth_image.shape} size is {depth_image.size} and type {depth_image.dtype}\n")
-
-            # clamp depth image to 10 meters to make output image human friendly
-            #depth_image[depth_image < -10] = -10
-
-            # flip the direction so near-objects are light and far objects are dark
-            #normalized_depth = -255.0 * (depth_image / np.min(depth_image + 1e-4))
-
-            # Convert to a pillow image and write it to disk
-            #normalized_depth_image = im.fromarray(normalized_depth.astype(np.uint8), mode="L")
-            #normalized_depth_image.save("graphics_images/depth_env%d_cam%d_frame%d.jpg" % (ii, jj, frame_count))
+        # Convert to a pillow image and write it to disk
+        #normalized_depth_image = im.fromarray(normalized_depth.astype(np.uint8), mode="L")
+        #normalized_depth_image.save("graphics_images/depth_env%d_cam%d_frame%d.jpg" % (ii, jj, frame_count))
+    print(depth_images)
     return
 
 
@@ -120,7 +93,6 @@ def take_3_random_actions(env, actionObj):  # TODO: move this fn to utils.py
     # Maybe for improvement, we add another, or velocity or something
 
 
-
     current_pos_t2, privileged_obs, rewards, resets, extras = take_random_action(env, actionObj)
 
     current_pos_t1, privileged_obs, rewards, resets, extras = take_random_action(env, actionObj)
@@ -140,7 +112,7 @@ def test_policy(args):
     actionObj = ActionObj(env_cfg)
 
     num_envs = env_cfg.env.num_envs
-    get_depth_image(num_envs, env, env_cfg)
+    get_depth_image(env)
 
 
     #for i in range(0, 50000):
