@@ -31,8 +31,8 @@ if __name__ == '__main__':
 
     for i_episode in range(NUM_EPISODES):
         # Initialize state, and preprocess it into a tensor that pytorch uses
-        state = reset_env()                         # initialize a state
-        state_p = process_state_for_dqn(state)      # Flatten state?
+        state = reset_env()                         # initialize a state (env.reset)
+        #state_p = process_state_for_dqn(state)      # Flatten state?
 
         T_COUNT = 100  # I think this shouldn't have a limit but for testing
         for t_timesteps in range(T_COUNT):

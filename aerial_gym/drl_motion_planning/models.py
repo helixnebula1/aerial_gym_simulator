@@ -54,6 +54,10 @@ class DQN(nn.Module):
 
         combined = torch.cat((i, pos), dim=1)
         combined = self.combined_img_pos_block(combined)
-        combined = F.softmax(combined, dim=1)
+
 
         return combined
+
+    #def output(self, forward?):        # So we can obtain the gradient of the forward.  Can't with softmax in there
+        #combined = F.softmax(forward, dim=1)
+        #return combined

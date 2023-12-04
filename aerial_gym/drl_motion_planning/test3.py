@@ -1,4 +1,6 @@
 import argparse
+import queue
+
 import numpy as np
 
 from collections import deque
@@ -27,27 +29,48 @@ class ActionObj:
 
 
 def test_policy(args):
-    env, env_cfg = task_registry.make_env(name=args.task, args=args)
-    env.reset()
-
     RANGE = 50000
     T_RANGE = 1
 
-    actionObj = ActionObj(env_cfg)
+    # Make environment
+    env, env_cfg = task_registry.make_env(name=args.task, args=args)
+    env.reset()
 
+    #
+    actionObj = ActionObj(env_cfg)
     num_envs = env_cfg.env.num_envs
 
-    #take_3_random_actions(env, actionObj)
+    # Lists to hold 8 last positions, and 3 last depth_images
+    POS_Q_SIZE = 8
+    DEPTH_Q_SIZE = 3
+    pos_queue = queue.Queue(maxsize=POS_Q_SIZE)
+    depth_image_queue = queue.Queue(maxsize=DEPTH_Q_SIZE)
+
+    # Observe beginning state
+    pos, depth_image, rewards, resets = observe_env(env, actionObj)
+    print("main ", type(pos), pos.shape)
+
+    # Fill the position and depth Qs for DQN to start with by repeating the first item
+    while pos_queue.full() == False:
+        pos_queue.put(pos)
+    while depth_image_queue.full() == False:
+        depth_image_queue.put(depth_image)
+
+    # Obtain the DQN tensors (3 depth images, 8 positions)
+    process_state_for_dqn(pos, depth_image, pos_queue, depth_image_queue)
+
+    #print(pos_queue.queue[0])
 
 
     for i in range(0, 50000):
 
-        #obs, privileged_obs, rewards, resets, extras = take_random_action(env, actionObj)
-        obs, rewards, resets = take_3_random_actions(env, actionObj)
+        take_random_action(env, actionObj)
+        pos, depth_image, rewards, resets = observe_env(env, actionObj)
+        process_state_for_dqn(pos, depth_image, pos_queue, depth_image_queue)
 
         if i % 500 == 0:
             print("Resetting command")
-            current_pos = obs #obs[:, :3]
+            current_pos = pos #obs[:, :3]
 
             print(i, " ------------------")
             env.reset()
