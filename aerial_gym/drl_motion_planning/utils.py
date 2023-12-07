@@ -8,6 +8,9 @@ ACTION_DIM = 18
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
+
+
+
 class ReplayMemory(object):
 
     def __init__(self, capacity):
@@ -129,7 +132,7 @@ def process_state_for_dqn(pos, depth_image, queue_current_pos, queue_depth_image
     queue_depth_images.put(depth_image)
 
     # Stack the most recent 3 depth images
-
+    # Double check the order these go in the queue and are used in teh dqn # TODO
     rel_depth_images = torch.stack([queue_depth_images.queue[0], queue_depth_images.queue[1], queue_depth_images.queue[2]], dim=1)
 
     # Stack the most recent 8 positions
