@@ -5,26 +5,6 @@ from collections import namedtuple, deque
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ACTION_DIM = 18
 
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
-
-
-
-
-class ReplayMemory(object):
-
-    def __init__(self, capacity):
-        self.memory = deque([], maxlen=capacity)
-
-    def push(self, *args):
-        """Save a transition"""
-        self.memory.append(Transition(*args))
-
-    def sample(self, batch_size):
-        return np.random.sample(self.memory, batch_size)
-
-    def __len__(self):
-        return len(self.memory)
 
 
 def get_action(current_pos, motion_primitive):
