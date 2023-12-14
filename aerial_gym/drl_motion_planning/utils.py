@@ -1,11 +1,36 @@
 import torch
 import numpy as np
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+import random
 from collections import namedtuple, deque
+from utils import *
+import math
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ACTION_DIM = 18
 
 
+
+
+Transition = namedtuple('Transition',
+                        ('pos', 'depth', 'action', 'nextPos', 'nextDepth', 'reward'))
+
+class ReplayMemoryClass(object):
+
+    def __init__(self, capacity):
+        self.memory = deque([], maxlen=capacity)
+
+    def push(self, *args):
+        self.memory.append(Transition(*args))
+
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+        return len(self.memory)
 
 def get_action(current_pos, motion_primitive):
     actions = torch.tensor([[0, 0, 0],
@@ -85,6 +110,28 @@ def take_random_action(env, actionObj):
 
     return
 
+def take_random_action2(posT, depthT, env):
+    # Inputs are tensors, position and depth
+    EPS_START = 0.9
+    EPS_END = 0.05
+    EPS_DECAY = 1000
+
+    global steps_done
+    sample = random.random()
+    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
+        math.exp(-1. * steps_done / EPS_DECAY)
+    steps_done += 1
+    if sample > eps_threshold:
+        with torch.no_grad():
+            # t.max(1) will return the largest column value of each row.
+            # second column on max result is index of where max element was
+            # found, so we pick action with the larger expected reward.
+            return policy_net(state).max(1).indices.view(1, 1)
+    else:
+        return torch.tensor([[env.action_space.sample()]], device=DEVICE, dtype=torch.long)
+
+    return
+
 def observe_env(env, actionObj):
     # Step the environment and observe new state and reward.
     # If the same command_action is used 3x in a row, the observations are the same for each,
@@ -127,3 +174,4 @@ def process_state_for_dqn(pos, depth_image, queue_current_pos, queue_depth_image
     #print(depth_images.shape)  #torch.Size([270, 3, 480, 1])
     #print(rel_pos.size, rel_pos.shape)
     return rel_pos, rel_depth_images
+

@@ -1,6 +1,5 @@
 import argparse
 import queue
-import random
 from misc_utils import *
 import numpy as np
 from collections import deque
@@ -18,6 +17,7 @@ from train_utils import *
 # --task="quad_with_obstacles"
 # python3 test3.py --num_envs 15 --task="quad_with_obstacles"
 from models import DQN
+from models import *
 
 torch.manual_seed(42)
 
@@ -71,44 +71,6 @@ class StateQClass:
         return rel_pos, rel_depth_images
 
 
-#class StateClass:
-#    def __init__(self,  POS_Q_SIZE, DEPTH_Q_SIZE):
-#        self.pos = # Tensor size
-#        self.depth = # Tensor size
-
-#    def set(self, pos, depth):
-#        self.pos = pos
-#        self.depth = depth
-
-
-class ExperienceClass:
-    def __init__(self, pos, depth, action, nextPos, nextDepth, reward):
-        # I think I should init these things with zeros, but not sure how big they are
-        self.pos= pos  # This is a tensor
-        self.depth= depth  # This is a tensor
-        self.action = action    # This needs to be the output of the dqn type
-        self.nextPos= nextPos  # This is a tensor
-        self.nextDepth= nextDepth  # This is a tensor
-        self.reward = reward
-
-
-Transition = namedtuple('Transition',
-                        ('pos', 'depth', 'action', 'nextPos', 'nextDepth', 'reward'))
-class ReplayMemoryClass(object):
-
-    def __init__(self, capacity):
-        self.memory = deque([], maxlen=capacity)
-
-    def push(self, *args):
-        self.memory.append(Transition(*args))
-
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
-
-    def __len__(self):
-        return len(self.memory)
-
-
 
 def test_policy(args):
     RANGE = 50000
@@ -143,10 +105,25 @@ def test_policy(args):
     # Set up memory replay queue
     # Instantiate Experience object to hold an experience for storage and replay
     # Initialize replay memory
-    REPLAY_MEMORY_DEPTH = 50
-    REPLAY_BATCH_SIZE = 32
+    REPLAY_MEMORY_DEPTH = 10 # 50
+    REPLAY_BATCH_SIZE = 3
     replayMemoryObj = ReplayMemoryClass(REPLAY_MEMORY_DEPTH)
 
+    GAMMA = 0.99
+    TAU = 0.005
+    LR = 1e-4
+    steps_done = 0
+
+    # Policy and target network
+    IMAGE_HEIGHT = 270
+    IMAGE_WIDTH = 480
+    OBS_DIM = IMAGE_HEIGHT * IMAGE_WIDTH
+    ACTION_DIM = 18     # Number of action primitives
+
+    policy_net = DQN5(OBS_DIM, ACTION_DIM).to(DEVICE)
+    target_net = DQN5(OBS_DIM, ACTION_DIM).to(DEVICE)
+    #target_net.load_state_dict(policy_net.state_dict())
+    optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
 
     for i in range(0, 50000):
 
@@ -162,13 +139,10 @@ def test_policy(args):
         # Get the next state (these are tensors obtained from the queue of states - pos, depth
         nextPosT, nextDepthT = stateQObj.state()        # This returns the latest 8 position observations, and latest 3 depth observations as tensors
 
-        # I wanted to have a class with 2 tensors, one for position and one for depth - but is it necessary?
-        #nextStateObj.set(nextPosT, nextDepthT)       # This was to have objects to push on experience replay
-
         # Push the transition into replay memory
         replayMemoryObj.push(posT, depthT, actionObj, nextPosT, nextDepthT, rewards)
-        x = replayMemoryObj.sample(REPLAY_BATCH_SIZE)
-        print(type(x))
+        #x = replayMemoryObj.sample(REPLAY_BATCH_SIZE)
+        #print(type(x))
 
         if rewards < 0:  # If we've hit a wall/obstacle or crashed
             break
@@ -177,7 +151,7 @@ def test_policy(args):
         posT, depthT = nextPosT, nextDepthT
 
         # Perform one step optimization of the policy network
-        optimize_model()
+        #optimize_model(memory, BATCH_SIZE, target_net, policy_net, GAMMA, optimizer)
 
         if i % 500 == 0:
             print("Resetting command")
