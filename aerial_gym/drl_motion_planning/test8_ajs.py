@@ -64,10 +64,11 @@ class StateQClass:
             [self.depth.queue[0], self.depth.queue[1], self.depth.queue[2]], dim=1)
 
         # Stack the most recent 8 positions
-        rel_pos = torch.stack([self.pos.queue[0], self.pos.queue[1],
-                               self.pos.queue[2], self.pos.queue[3],
-                               self.pos.queue[4], self.pos.queue[5],
-                               self.pos.queue[6], self.pos.queue[7]], dim=1)
+        #rel_pos = torch.stack([self.pos.queue[0], self.pos.queue[1],
+        #                       self.pos.queue[2], self.pos.queue[3],
+        #                       self.pos.queue[4], self.pos.queue[5],
+        #                       self.pos.queue[6], self.pos.queue[7]], dim=1)
+        rel_pos = torch.tensor(self.pos.queue[0])
         return rel_pos, rel_depth_images
 
 
@@ -85,7 +86,7 @@ def test_policy(args):
     num_envs = env_cfg.env.num_envs
 
     # Lists to hold 8 last positions, and 3 last depth_images
-    POS_Q_SIZE = 8
+    POS_Q_SIZE = 1
     DEPTH_Q_SIZE = 3
 
 
@@ -121,8 +122,8 @@ def test_policy(args):
     ACTION_DIM = 18     # Number of action primitives
 
     policy_net = DQN5(OBS_DIM, ACTION_DIM).to(DEVICE)
-    #target_net = DQN5(OBS_DIM, ACTION_DIM).to(DEVICE)
-    #target_net.load_state_dict(policy_net.state_dict())
+    target_net = DQN5(OBS_DIM, ACTION_DIM).to(DEVICE)
+    target_net.load_state_dict(policy_net.state_dict())
     optimizer = optim.AdamW(policy_net.parameters(), lr=LR, amsgrad=True)
 
     print("observaton space ", env.observation_space.high, env.observation_space.low)
@@ -154,6 +155,8 @@ def test_policy(args):
 
         # Perform one step optimization of the policy network
         #optimize_model(memory, BATCH_SIZE, target_net, policy_net, GAMMA, optimizer)
+
+        steps_done += 1
 
         if i % 500 == 0:
             print("Resetting command")

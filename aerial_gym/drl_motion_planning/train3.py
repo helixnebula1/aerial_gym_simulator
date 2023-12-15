@@ -4,6 +4,7 @@ from misc_utils import *
 import numpy as np
 from collections import deque
 import math
+import math
 
 import isaacgym
 from aerial_gym.envs import *
@@ -12,13 +13,14 @@ import torch
 
 from utils import *
 from train_utils import *
+from models import DQN1a
 #from models import *
 
 
 # Some code resue from https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 # --task="quad_with_obstacles"
 # python3 test3.py --num_envs 15 --task="quad_with_obstacles"
-from models import DQN
+
 
 torch.manual_seed(42)
 
@@ -59,18 +61,16 @@ class StateQClass:
         self.pos.put(pos)
         self.depth.put(depth)
 
-    def state(self):
+    def state(self):   # Returns relative positions, and 3 depth images
         # Stack the most recent 3 depth images
         # Double check the order these go in the queue and are used in teh dqn # TODO
         rel_depth_images = torch.stack(
-            [self.depth.queue[0], self.depth.queue[1], self.depth.queue[2]], dim=1)
+            [self.depth.queue[0], self.depth.queue[1], self.depth.queue[2]], dim=2)
+        rel_depth_images = torch.squeeze(rel_depth_images)  # 270 x 480 x 3
 
-        # Stack the most recent 8 positions
-        #rel_pos = torch.stack([self.pos.queue[0], self.pos.queue[1],
-        #                       self.pos.queue[2], self.pos.queue[3],
-        #                       self.pos.queue[4], self.pos.queue[5],
-        #                       self.pos.queue[6], self.pos.queue[7]], dim=1)
-        rel_pos = torch.tensor(self.pos.queue[0])
+        # Most recent position
+        rel_pos = torch.tensor(self.pos.queue[0], dtype=torch.float)    # 1x3
+
         return rel_pos, rel_depth_images
 
 def train_policy(args):
@@ -112,9 +112,9 @@ def train_policy(args):
     # Target and policy networks
     TAU = 0.005
     LR = 1e-4
-    policy_net = DQN(OBS_DIM, ACTION_DIM).to(DEVICE)
-    target_net = DQN(OBS_DIM, ACTION_DIM).to(DEVICE)
-    target_net.load_state_dict(policy_net.state_dict())
+    policy_net = DQN1a(OBS_DIM, ACTION_DIM).to(DEVICE)
+    #target_net = DQN(OBS_DIM, ACTION_DIM).to(DEVICE)
+    #target_net.load_state_dict(policy_net.state_dict())
     optimizer = torch.optim.Adam(policy_net.parameters(), lr=LR)
 
     # Constants
@@ -126,23 +126,24 @@ def train_policy(args):
 
 
 
-    def select_action(posT, depthT):
+    def select_action(posT, depthT, steps_done):
         EPS_START = 0.9
         EPS_END = 0.05
         EPS_DECAY = 1000
 
         sample = random.random()
-        eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-                        math.exp(-1. * steps_done / EPS_DECAY)
-        steps_done += 1
-        if sample > eps_threshold:
+        eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * steps_done / EPS_DECAY)
+
+        #print("select_action", posT)
+        if sample > 0:  # eps_threshold:
             with torch.no_grad():
                 # t.max(1) will return the largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                return policy_net(depthT, posT).max(1).indices.view(1, 1)
+                #x=policy_net(depthT, posT).max(1).indices.view(1, 1)
+                return policy_net(depthT, posT).max()
         else:
-            return torch.tensor([[env.action_space.sample()]], device=DEVICE, dtype=torch.long)
+            return np.random.randint(ACTION_DIM)    # Return a number from 0-ACTION_DIM-1
 
     def optimize_model():
         if len(replayMemoryObj) < REPLAY_BATCH_SIZE:
@@ -162,12 +163,12 @@ def train_policy(args):
         non_final_next_pos = torch.cat([s for s in batch.nextPos
                                            if s is not None])
 
-        print("types ", type(batch.pos))
+        #print("types ", type(batch.pos))
         pos_batch = torch.cat(batch.pos)
         depth_batch = torch.cat(batch.depth)
         action_batch = batch.action #torch.cat(batch.action)
         reward_batch = batch.reward #torch.cat(batch.reward)
-        print(pos_batch.shape, depth_batch.shape, type(action_batch), type(reward_batch))
+        #print(pos_batch.shape, depth_batch.shape, type(action_batch), type(reward_batch))
 
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
@@ -190,6 +191,8 @@ def train_policy(args):
     for i in range(0, 50000):
 
         # Take random action.  # We will have to replace this with something like: action = DQN(posT, depthT)
+        action = select_action(posT, depthT, steps_done)
+        #print("type action", type(action), action.shape)
         take_random_action(env, actionObj)
 
         # Observe reward and environment
@@ -215,6 +218,9 @@ def train_policy(args):
         # Make next state the current state
         posT, depthT = nextPosT, nextDepthT
         optimize_model()
+
+        # Increment number of steps
+        steps_done += 1
 
 
 if __name__ == '__main__':

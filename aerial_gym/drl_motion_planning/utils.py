@@ -50,7 +50,7 @@ def get_action(current_pos, motion_primitive):
                             [1, 0, -1],
                             [1, -1, -1],
                             [1, -1, 0],
-                            [1, -1, 1]], dtype=torch.float32, device=DEVICE)
+                            [1, -1, 1]], dtype=torch.float, device=DEVICE)
 
     motion_primitive = torch.tensor(motion_primitive, device=DEVICE)
     #return current_pos + torch.matmul(actions, motion_primitive)
@@ -89,7 +89,7 @@ def get_depth_image(env):
             #normalized_depth_image = im.fromarray(normalized_depth.astype(np.uint8), mode="L")
             #normalized_depth_image.save("graphics_images/depth_env%d_cam%d_frame%d.jpg" % (ii, jj, frame_count))
 
-    depth_images = torch.tensor(depth_images, device=DEVICE)
+    depth_images = torch.tensor(depth_images, device=DEVICE, dtype=torch.float)
 
     return depth_images
 
@@ -110,25 +110,18 @@ def take_random_action(env, actionObj):
 
     return
 
-def take_random_action2(posT, depthT, env):
-    # Inputs are tensors, position and depth
-    EPS_START = 0.9
-    EPS_END = 0.05
-    EPS_DECAY = 1000
+def take_action(env, actionObj, mp):
+    # Take action using motion primitive mp
 
-    global steps_done
-    sample = random.random()
-    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
-        math.exp(-1. * steps_done / EPS_DECAY)
-    steps_done += 1
-    if sample > eps_threshold:
-        with torch.no_grad():
-            # t.max(1) will return the largest column value of each row.
-            # second column on max result is index of where max element was
-            # found, so we pick action with the larger expected reward.
-            return policy_net(state).max(1).indices.view(1, 1)
-    else:
-        return torch.tensor([[env.action_space.sample()]], device=DEVICE, dtype=torch.long)
+    #mp = np.random.randint(1, ACTION_DIM)
+    actionObj.motionPrimitive[:, mp] = 1.0
+    target_pos = get_action(actionObj.currentPos, actionObj.motionPrimitive)
+
+    # Obtain command action given target position, using lee position controller
+    actionObj.commandActions[:, 0] = target_pos[:,0] # x
+    actionObj.commandActions[:, 1] = target_pos[:,1] # y
+    actionObj.commandActions[:, 2] = target_pos[:,2] # z
+    actionObj.commandActions[:, 3] = 0.0 # yaw
 
     return
 
@@ -137,7 +130,6 @@ def observe_env(env, actionObj):
     # If the same command_action is used 3x in a row, the observations are the same for each,
     # so it appears there's one step for each commanded action, and you don't get observations in between
     obs, privileged_obs, rewards, resets, extras = env.step(actionObj.commandActions)
-    #current_pos = obs[:, :3]
 
     depth_image = get_depth_image(env)
 
