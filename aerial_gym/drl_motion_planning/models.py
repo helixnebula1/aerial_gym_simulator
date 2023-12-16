@@ -8,15 +8,16 @@ class DQN1a(nn.Module): # Tejas'?
         super(DQN1a, self).__init__()
         self.img_height = 270
         self.img_width = 480
+        self.img_channels = 3
 
         self.img_block = nn.Sequential(
-            nn.Linear(129600, 128),
+            nn.Linear(img_dim, 128),
             nn.Linear(128, 16),
             nn.Linear(16, 8)
         )
 
         self.latest_img_block = nn.Sequential(
-            nn.Linear(129600, 128),
+            nn.Linear(img_dim, 128),
             nn.Linear(128, 16),
             nn.Linear(16, 16)
         )

@@ -26,7 +26,7 @@ torch.manual_seed(42)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-OBS_DIM = 10
+OBS_DIM = 270*480
 ACTION_DIM = 18
 
 class ActionObj:
@@ -96,11 +96,17 @@ def train_policy(args):
     stateQObj = StateQClass(POS_Q_SIZE, DEPTH_Q_SIZE)
 
     # Observe beginning state (reset state)
+    # pos: Tensor [1,3]
+    # depth_image: Tensor [270, 480, 1]
+    # rewards: Tensor [1]
+    # resets: Tensor [1]
     pos, depth_image, rewards, resets = observe_env(env, actionObj)
-    stateQObj.resetState(pos, depth_image)  # Use the beginning state to reset state queue
 
-    # Set current state
-    posT, depthT = stateQObj.state()        # Torch tensor
+    # Use the beginning state to reset state queue - repeat these in the queue
+    stateQObj.resetState(pos, depth_image)
+
+    # Set current state (1 position, 3 depth images)
+    pos, depth = stateQObj.state()        # Torch tensors [1,3] and [270,480,3]
 
     # Set up memory replay queue
     # Instantiate Experience object to hold an experience for storage and replay
@@ -134,14 +140,10 @@ def train_policy(args):
         sample = random.random()
         eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * steps_done / EPS_DECAY)
 
-        #print("select_action", posT)
-        if sample > 0:  # eps_threshold:
+        if sample > 0: #eps_threshold:  # TODO convert this back to eps_threshold
             with torch.no_grad():
-                # t.max(1) will return the largest column value of each row.
-                # second column on max result is index of where max element was
-                # found, so we pick action with the larger expected reward.
-                #x=policy_net(depthT, posT).max(1).indices.view(1, 1)
-                return policy_net(depthT, posT).max()
+                # Return index of largest Q value, converted to int (rather than tensor)
+                return int(policy_net(depthT, posT).argmax())  # Tensors [270,480,3], [1,3]
         else:
             return np.random.randint(ACTION_DIM)    # Return a number from 0-ACTION_DIM-1
 
@@ -157,57 +159,71 @@ def train_policy(args):
         # Compute a mask of non-final states and concatenate the batch elements
         # (a final state would've been the one after which simulation ended)
         # non_final_mask is a torch tensor of size 32
-        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                               batch.nextPos)), device=DEVICE, dtype=torch.bool)
+        non_final_mask = tuple(map(lambda s: s is not None,
+                                               batch.nextPos))
 
-        non_final_next_pos = torch.cat([s for s in batch.nextPos
-                                           if s is not None])
+        non_final_next_pos = [s for s in batch.nextPos
+                                           if s is not None]
 
+        #print("***", batch.pos.shape, type(batch.pos), batch.depth.shape, type(batch.depth))
         #print("types ", type(batch.pos))
-        pos_batch = torch.cat(batch.pos)
-        depth_batch = torch.cat(batch.depth)
-        action_batch = batch.action #torch.cat(batch.action)
-        reward_batch = batch.reward #torch.cat(batch.reward)
-        #print(pos_batch.shape, depth_batch.shape, type(action_batch), type(reward_batch))
+        #pos_batch = torch.cat(batch.pos)
+        #print("888", pos_batch.shape, type(pos_batch))
+        #depth_batch = torch.cat(batch.depth)
+        print("***lensbatch ",len(batch.pos), len(batch.depth[0]), len(batch.action), len(batch.reward))
 
+        pos_batch = torch.cat(batch.pos)            # [32,3]
+        depth_batch = torch.stack(batch.depth)      # [32, 270, 480, 3]
+        action_batch = torch.tensor(batch.action)   # [32]
+        reward_batch = torch.cat(batch.reward)      # [32]
+        print("\n***types ",type(pos_batch), type(depth_batch), type(action_batch), type(reward_batch))
+        print("***lens ",len(pos_batch), len(depth_batch), len(action_batch), len(reward_batch))
+        print("***shape ",pos_batch.shape, depth_batch.shape, action_batch.shape, reward_batch.shape)
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        # state_action_values = policy_net(state_batch).gather(1, action_batch)
+        state_action_values = torch.zeros(REPLAY_BATCH_SIZE, device=DEVICE)
+        for ii in range(REPLAY_BATCH_SIZE):
+            p = torch.unsqueeze(pos_batch[ii,:], dim=0)
+            state_action_values[ii] = policy_net(depth_batch[ii,:,:,:],p).argmax() #gather(1, action_batch) # TODO not sure this line is correct
 
         # Compute V(s_{t+1}) for all next states.
         # Expected values of actions for non_final_next_states are computed based
         # on the "older" target_net; selecting their best reward with max(1).values
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
-        # next_state_values = torch.zeros(args.batch_size, device=DEVICE)
-        # with torch.no_grad():
-        #    next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
+        next_state_values = torch.zeros(args.batch_size, device=DEVICE)
+        with torch.no_grad():
+            for ?
+            next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
         # Compute the expected Q values
-        # expected_state_action_values = (next_state_values * args.gamma) + reward_batch
+        # expected_state_action_values = (next_state_values * GAMMA) + reward_batch
         return
 
     for i in range(0, 50000):
 
-        # Take random action.  # We will have to replace this with something like: action = DQN(posT, depthT)
-        action = select_action(posT, depthT, steps_done)
+        # Select random action.
+        action = select_action(pos, depth, steps_done)
         #print("type action", type(action), action.shape)
-        take_random_action(env, actionObj)
+
+        # Take the action
+        take_action(env, actionObj, action)
 
         # Observe reward and environment
         pos_next, depth_image_next, rewards, resets = observe_env(env, actionObj)
         #rewards = torch.tensor([rewards], device=DEVICE)
-        #print(rewards.shape)
+
 
         # Add observations to the queue since we need to put multiple observations through the DQN
         stateQObj.addObservation(pos_next, depth_image_next)
 
         # Get the next state (these are tensors obtained from the queue of states - pos, depth
-        nextPosT, nextDepthT = stateQObj.state()        # This returns the latest 8 position observations, and latest 3 depth observations as tensors
+        nextPos, nextDepth = stateQObj.state()        # This returns the latest 8 position observations, and latest 3 depth observations as tensors
+        #print("\n***types here", type(nextPos), type(nextDepth), nextPos.shape, nextDepth.shape)
 
         # Push the transition into replay memory
-        replayMemoryObj.push(posT, depthT, actionObj, nextPosT, nextDepthT, rewards)
+        replayMemoryObj.push(pos, depth, action, nextPos, nextDepth, rewards)
         #x = replayMemoryObj.sample(REPLAY_BATCH_SIZE)
         #print(type(x))
         #optimize_model()
@@ -216,7 +232,7 @@ def train_policy(args):
             break
 
         # Make next state the current state
-        posT, depthT = nextPosT, nextDepthT
+        pos, depth = nextPos, nextDepth
         optimize_model()
 
         # Increment number of steps
